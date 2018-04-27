@@ -1,4 +1,40 @@
-function findcalls_v4_echo_mcr(wd,fs,fileType)
+function findcalls_echo(wd,fs,varargin)
+%% Find, extract, and save social vocalizations from audio recordings
+% INPUT:
+% wd: working directory, file path which contains files to be analyzed
+% fs: sampling rate of recorded files
+% Optional: 
+% fileType: 'wav' or 'mat' to indicate format of recordings
+% anal_dir: file path to save extracted files
+%
+% WARNING: Many individual parameters to be tuned!
+%
+% OUTPUT:
+% Individual calls will be saved off in individual file in anal_dir named 
+% with the original files's name and appeneded with a string '_Call_XXX'
+% where XXX is the three digit number of calls within that file.
+%%
+
+if nargin == 2
+    wav_mat_file = input('wav (1) or mat (2) file?');
+    if wav_mat_file == 1
+        fileType = 'wav';
+    elseif wav_mat_file == 2
+        fileType = 'mat';
+    else
+        disp('Invalid input');
+        return
+    end
+    anal_dir = [wd 'Analyzed_auto' filesep];
+elseif nargin == 3
+    fileType = varargin{1};
+    anal_dir = [wd 'Analyzed_auto' filesep];
+elseif nargin == 4
+    fileType = varargin{1};
+    anal_dir = varargin{2};
+end
+
+
 debug = false;
 low_filter_cutoff = [1e3 2e3];
 high_filter_cutoff = [40e3 50e3];
@@ -7,12 +43,9 @@ n_std_thresh_high = 10;
 n_std_thresh_low = 10;
 quiet_file_thresh = 1e-3;
 echo_separation = 1e-3 * [10 40]; %in sec
-durthresh_min=1e-3*0.1;
 durthresh_max= 1e-2;
 echo_peak_offset = 1e-3*[3 3];
-interecho_thresh_scale = 1/2.5;
 n_baseline_chunks = 10;
-min_call_sep = fs/2;
 smooth_span = 4e-3*fs;
 min_peak_prominence = 1e-5;
 remove_isolated_calls = false;
@@ -22,13 +55,11 @@ remove_isolated_calls = false;
 [cenvFilt(1,:), cenvFilt(2,:)] = ellip(5,5,60,2*cenv_filter_cutoff(2)/fs,'low');
 
 rec_files = dir([wd '*.' fileType]);
-anal_dir = [wd 'Analyzed_auto_echo' filesep];
-if ~isdir(anal_dir)
-    mkdir(anal_dir);
-else
-    rmdir(anal_dir,'s');
+
+if ~isfolder(anal_dir)
     mkdir(anal_dir);
 end
+
 if debug
     h1 = figure;
     h2 = figure;
@@ -114,7 +145,7 @@ for fln = 1:n_files
        cutcalls{w} = data_raw(wins(w,1):wins(w,2));
     end
     if debug && file_callcount
-        for w = []% 1:size(wins,1)
+        for w = 1:size(wins,1)
             figure(h1);
             clf
             subplot(1,2,1);

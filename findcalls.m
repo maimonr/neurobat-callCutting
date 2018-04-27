@@ -1,5 +1,19 @@
-function findcalls_v5_mcr(wd,fs,varargin)
-
+function findcalls(wd,fs,varargin)
+%% Find, extract, and save social vocalizations from audio recordings
+% INPUT:
+% wd: working directory, file path which contains files to be analyzed
+% fs: sampling rate of recorded files
+% Optional: 
+% fileType: 'wav' or 'mat' to indicate format of recordings
+% anal_dir: file path to save extracted files
+%
+% WARNING: Many individual parameters to be tuned!
+%
+% OUTPUT:
+% Individual calls will be saved off in individual file in anal_dir named 
+% with the original files's name and appeneded with a string '_Call_XXX'
+% where XXX is the three digit number of calls within that file.
+%%
 if nargin == 2
     wav_mat_file = input('wav (1) or mat (2) file?');
     if wav_mat_file == 1
@@ -49,7 +63,7 @@ params(2).wEntThresh = 0.5;
 
 rec_files = dir([wd '*.' fileType]);
 
-if ~isdir(anal_dir)
+if ~isfolder(anal_dir)
     mkdir(anal_dir);
 end
 n_files = length(rec_files);
