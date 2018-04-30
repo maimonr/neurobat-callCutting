@@ -99,7 +99,7 @@ end
 
 save_call_data = input('build and save cut call data file?');
 if save_call_data
-    cut_call_data = get_corrected_call_times_v2(wd,callDir,call_str);
+    cut_call_data = get_corrected_call_times(wd,callDir,call_str);
     
     switch call_str
         case 'Call'
