@@ -24,10 +24,10 @@ if nargin == 2
         disp('Invalid input');
         return
     end
-    anal_dir = [wd 'Analyzed_auto' filesep];
+    anal_dir = fullfile(wd, 'Analyzed_auto');
 elseif nargin == 3
     fileType = varargin{1};
-    anal_dir = [wd 'Analyzed_auto' filesep];
+    anal_dir = fullfile(wd, 'Analyzed_auto');
 elseif nargin == 4
     fileType = varargin{1};
     anal_dir = varargin{2};
@@ -127,7 +127,7 @@ for fln = 1:n_files
         for w = find(isCall)
             callpos = wins(w,:);
             cut = data_raw(callpos(1):callpos(2));
-            save([anal_dir filename(1:end-4) '_Call_' sprintf('%03d',file_callcount) '.mat'],'cut','callpos','fs');
+            save(fullfile(anal_dir, [filename(1:end-4) '_Call_' sprintf('%03d',file_callcount) '.mat']),'cut','callpos','fs');
             file_callcount = file_callcount + 1;
         end
         if strcmp(fileType,'mat')

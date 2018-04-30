@@ -1,8 +1,8 @@
 function cut_call_data = get_corrected_call_times(audioDir,analyzed_audio_dir,call_str)
 
-audio2nlg = load([audioDir 'audio2nlg_fit.mat']); % load correction between avisoft and NLG time data
+audio2nlg = load(fullfile(audioDir, 'audio2nlg_fit.mat')); % load correction between avisoft and NLG time data
 
-wav_files = dir([audioDir '*.wav']); % load raw audio recordings
+wav_files = dir(fullfile(audioDir, '*.wav')); % load raw audio recordings
 % sort wav files according to numbering
 wav_files_name = {wav_files.name};
 wav_file_nums = cellfun(@(x) str2double(regexp(x,'(?<=_)\d+(?=.WAV)','match','ignorecase')), wav_files_name); 
@@ -47,7 +47,7 @@ for call_f = 1:n_cut_call_files
         cut_call_data(call_f).(cut_call_fields{f}) = s.(cut_call_fields{f});
     end
     f_name_split = strsplit(cut_call_files(call_f).name,{'_','.'});
-    cut_call_data(call_f).fName = [audioDir strjoin(f_name_split(1:2),'_') '.WAV'];
+    cut_call_data(call_f).fName = fullfile(audioDir, [strjoin(f_name_split(1:2),'_') '.WAV']);
     cut_call_data(call_f).f_num = str2double(f_name_split{2}) - start_f_num + 1;
     cut_call_data(call_f).expDay = expDay;
     cut_call_data(call_f).batNum = batNum;

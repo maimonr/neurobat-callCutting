@@ -2,9 +2,9 @@ function manual_classify_calls(wd,call_str)
 
 switch call_str
     case 'Call'
-        callDir = [wd 'Analyzed_auto' filesep];
+        callDir = [wd filesep 'Analyzed_auto' filesep];
     case 'Echo'
-        callDir = [wd 'Analyzed_auto_echo' filesep];
+        callDir = [wd fielsep 'Analyzed_auto_echo' filesep];
 end
 
 
