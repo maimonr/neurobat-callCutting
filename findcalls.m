@@ -61,7 +61,7 @@ params(2).rmsthresh = 0.001;
 params(2).powerRatioThresh = 10;
 params(2).wEntThresh = 0.5;
 
-rec_files = dir([wd '*.' fileType]);
+rec_files = dir(fullfile(wd,['*.' fileType]));
 
 if ~isfolder(anal_dir)
     mkdir(anal_dir);
@@ -76,9 +76,9 @@ for fln = 1:n_files
     
     switch fileType
         case 'wav'
-            data_raw = audioread([wd filename]);
+            data_raw = audioread(fullfile(wd, filename));
         case 'mat'
-            data_raw = load([wd filename]);
+            data_raw = load(fullfile(wd, filename));
             if isfield(data_raw,'analyzed') && ~reanalyze
                if data_raw.analyzed
                    continue
@@ -131,7 +131,7 @@ for fln = 1:n_files
             file_callcount = file_callcount + 1;
         end
         if strcmp(fileType,'mat')
-            save([wd filename],'analyzed','-append');
+            save(fullfile(wd, filename),'analyzed','-append');
         end
     end
     
