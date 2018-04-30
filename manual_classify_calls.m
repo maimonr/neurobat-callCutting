@@ -36,10 +36,10 @@ for c = fNum:nCalls
     origRec_fName = strsplit(callFiles(c).name,'_');
     
     if wav_mat_file == 1
-        origRec_fName = [wd strjoin(origRec_fName(1:end-2),'_') '.WAV'];
+        origRec_fName = fullfile(wd, [strjoin(origRec_fName(1:end-2),'_') '.WAV']);
         dataFull = audioread(origRec_fName);
     elseif wav_mat_file == 2
-        origRec_fName = [wd strjoin(origRec_fName(1:end-2),'_') '.mat'];
+        origRec_fName = fullfile(wd, [strjoin(origRec_fName(1:end-2),'_') '.mat']);
         d = load(origRec_fName);
         dataFull = d.(recVar_full);
     end
