@@ -33,6 +33,12 @@ if isempty(params)
     wEntThresh = Inf;
     
     params(1) = struct('thresh',thresh,'callLength',callLength,'rmsthresh',rmsthresh,'mergethresh',mergethresh,'powerRatioThresh',powerRatioThresh,'wEntThresh',wEntThresh,'fs',fs);
+    params(2) = params(1);
+    params(2).thresh = 0.75e-3;
+    params(2).callLength = 0.01;
+    params(2).rmsthresh = 0;
+    params(2).powerRatioThresh = Inf;
+    params(2).wEntThresh = Inf;
 end
 
 rec_files = dir(fullfile(wd,['*.' fileType]));
@@ -74,7 +80,7 @@ for fln = 1:n_files
     allWins = calcWins(senv,params(1));
     [isCall,wins] = findCall(allWins,data_raw,params(1));
     
-    if length(params)==2 && any(isCall)
+    if any(isCall)
         allWins = calcWins(senv,params(2));
         [isCall,wins] = findCall(allWins,data_raw,params(2));
     end

@@ -2,9 +2,9 @@ function manual_classify_calls(wd,call_str)
 
 switch call_str
     case 'Call'
-        callDir = [wd filesep 'Analyzed_auto' filesep];
+        callDir = [wd 'Analyzed_auto' filesep];
     case 'Echo'
-        callDir = [wd fielsep 'Analyzed_auto_echo' filesep];
+        callDir = [wd 'Analyzed_auto_echo' filesep];
 end
 
 
@@ -18,7 +18,7 @@ recVar_full = 'recsGroup';
 wav_mat_file = input('wav (1) or mat (2) file?');
 
 callFiles = dir([callDir '*' call_str '*.mat']);
-callNums = cellfun(@(x) str2double(regexp(x,'(?<=_)\d+(?=.mat)','match')), {callFiles.name})';
+callNums = 1:length(callFiles);
 
 if exist([callDir 'current_classify_file_number.mat'],'file')
     f = load([callDir 'current_classify_file_number.mat']);

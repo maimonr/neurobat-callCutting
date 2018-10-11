@@ -25,10 +25,10 @@ if nargin == 2
         disp('Invalid input');
         return
     end
-    anal_dir = [wd 'Analyzed_auto' filesep];
+    anal_dir = [wd 'Analyzed_auto_echo' filesep];
 elseif nargin == 3
     fileType = varargin{1};
-    anal_dir = [wd 'Analyzed_auto' filesep];
+    anal_dir = [wd 'Analyzed_auto_echo' filesep];
 elseif nargin == 4
     fileType = varargin{1};
     anal_dir = varargin{2};

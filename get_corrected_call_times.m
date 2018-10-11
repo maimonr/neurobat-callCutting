@@ -22,6 +22,9 @@ bat_num_str = 'bat';
 bat_num_length = 5;
 idx = strfind(audioDir,bat_num_str) + length(bat_num_str);
 batNum = audioDir(idx:idx+bat_num_length-1);
+if isempty(batNum)
+    batNum = NaN;
+end
 
 % initialize data structure
 cut_call_data = struct('callpos',{},'cut',{},'corrected_callpos',{},'f_num',{},'fName',{},'fs',{},'noise',{},'expDay',{},'batNum',{});
@@ -36,7 +39,7 @@ if any(isnan(cum_samples))
 else
     goodCorrection = 1;
 end
-fs_wav = 250e3 + 21; % add in minor sampling rate correction
+fs_wav = 250e3; % add in minor sampling rate correction
 
 for call_f = 1:n_cut_call_files
     s = load([analyzed_audio_dir cut_call_files(call_f).name]);
@@ -62,6 +65,7 @@ for call_f = 1:n_cut_call_files
 end
 
 cut_call_fields = fieldnames(cut_call_data);
+cut_call_fields = cut_call_fields(~strcmp(cut_call_fields,'noise'));
 for f = 1:length(cut_call_fields)
     emptyFields = arrayfun(@(x) isempty(x.(cut_call_fields{f})), cut_call_data);
     assert(~any(emptyFields));
