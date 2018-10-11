@@ -32,7 +32,7 @@ if isempty(params)
     powerRatioThresh = Inf;
     wEntThresh = Inf;
     
-    params(1) = struct('thresh',thresh,'callLength',callLength,'rmsthresh',rmsthresh,'mergethresh',mergethresh,'powerRatioThresh',powerRatioThresh,'wEntThresh',wEntThresh,'fs',fs);
+    params = struct('thresh',thresh,'callLength',callLength,'rmsthresh',rmsthresh,'mergethresh',mergethresh,'powerRatioThresh',powerRatioThresh,'wEntThresh',wEntThresh,'fs',fs);
 end
 
 rec_files = dir(fullfile(wd,['*.' fileType]));
