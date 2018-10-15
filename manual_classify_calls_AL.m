@@ -1,10 +1,6 @@
 function manual_classify_calls_AL(expDate,call_str)
 al_fs = 50e3;
 addpath('C:\Users\phyllo\Documents\GitHub\SoundAnalysisBats\')
-dataDir = 'D:\acoustic_recording\';
-T = readtable([dataDir 'recording_logs.csv']);
-T = T(T.Date==expDate,:);
-logger_base_dir = 'Z:\users\Maimon\acoustic_recording\video_and_AL\';
 audio_base_dir = 'Z:\users\Maimon\acoustic_recording\audio\';
 
 date_str_format = 'mmddyyyy';
@@ -19,16 +15,7 @@ switch call_str
         callDir = [audio_dir 'Analyzed_auto_echo' filesep];
 end
 
-audio2nlg = load([audio_dir 'audio2nlg_fit.mat']);
-
-logger_nums = T{1,4:2:14};
-logger_nums = logger_nums(~isnan(logger_nums));
-logger_nums = setdiff(logger_nums,str2double(T.malfunction_loggers{1}));
-loggerDir = [logger_base_dir dateStr '\audiologgers\'];
-for logger_k = 1:length(logger_nums)
-    data_fname = dir([loggerDir 'logger' num2str(logger_nums(logger_k)) filesep 'extracted_data' filesep '*CSC0.mat']);
-    tsData(logger_k) = load(fullfile(data_fname.folder,data_fname.name));
-end
+[~,tsData,audio2nlg] = get_AL_data(expDate);
 
 specParams = struct('colormap_name','hot','spec_win_size',512,'spec_overlap_size',500,'spec_nfft',1024,'fs',al_fs,'spec_ylims',[0 10],'spec_caxis_factor',0.1);
 orig_rec_plot_win = 5;
@@ -97,7 +84,6 @@ for c = fNum:nCalls
     call_ts_nlg = (corrected_callpos + audio2nlg.first_nlg_pulse_time)*1e3;
     
     piezo_chunk = cell(1,nLogger);
-    specParams = struct('colormap_name','hot','spec_win_size',512,'spec_overlap_size',500,'spec_nfft',1024,'fs',al_fs,'spec_ylims',[0 10],'spec_caxis_factor',0.1);
     logger_k = 1;
     call_ts_nlg_sample = get_voltage_samples_for_Nlg_timestamps(call_ts_nlg(:),...
         tsData(logger_k).Indices_of_first_and_last_samples(:,1)',...
@@ -118,9 +104,11 @@ for c = fNum:nCalls
             break
         end
         piezo_chunk_idx = call_ts_nlg_sample(1):call_ts_nlg_sample(end);
-        piezo_chunk{logger_k} = double(tsData(logger_k).AD_count_int16(piezo_chunk_idx));
+        try
+            piezo_chunk{logger_k} = double(tsData(logger_k).AD_count_int16(piezo_chunk_idx));
+            plot_call_spectrogram(piezo_chunk{logger_k},gca,specParams);
+        end
         
-        plot_call_spectrogram(piezo_chunk{logger_k},gca,specParams);
     end
     %%
     display(callFiles(c).name);

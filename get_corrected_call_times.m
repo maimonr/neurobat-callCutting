@@ -5,7 +5,7 @@ audio2nlg = load(fullfile(audioDir, 'audio2nlg_fit.mat')); % load correction bet
 wav_files = dir(fullfile(audioDir, '*.wav')); % load raw audio recordings
 % sort wav files according to numbering
 wav_files_name = {wav_files.name};
-wav_file_nums = cellfun(@(x) str2double(regexp(x,'(?<=_)\d+(?=.WAV)','match','ignorecase')), wav_files_name); 
+wav_file_nums = cellfun(@(x) str2double(regexp(x,'(?<=_)\d+(?=.WAV)','match','ignorecase')), wav_files_name);
 [~, sort_wav_files_idx] = sort(wav_file_nums);
 
 % load cut call files
@@ -45,13 +45,26 @@ for call_f = 1:n_cut_call_files
     s = load([analyzed_audio_dir cut_call_files(call_f).name]);
     % transfer all data from cut call file to the data structure we're
     % building here
-    cut_call_fields = fieldnames(s); 
+    cut_call_fields = fieldnames(s);
     for f = 1:length(cut_call_fields)
         cut_call_data(call_f).(cut_call_fields{f}) = s.(cut_call_fields{f});
     end
     f_name_split = strsplit(cut_call_files(call_f).name,{'_','.'});
-    cut_call_data(call_f).fName = fullfile(audioDir, [strjoin(f_name_split(1:2),'_') '.WAV']);
-    cut_call_data(call_f).f_num = str2double(f_name_split{2}) - start_f_num + 1;
+    
+    if length(f_name_split) > 5
+        fName = {fullfile(audioDir, [strjoin(f_name_split(1:2),'_') '.WAV']),...
+            fullfile(audioDir, [strjoin(f_name_split(3:4),'_') '.WAV'])};
+        fNum = [str2double(f_name_split{2}) str2double(f_name_split{4})] - start_f_num + 1;
+        if s.callpos(2) > audio2nlg.total_samples_by_file(fNum(1))
+           cut_call_data(call_f).callpos(2) = s.callpos(2) -  audio2nlg.total_samples_by_file(fNum(1));
+        end
+    else
+        fName = fullfile(audioDir, [strjoin(f_name_split(1:2),'_') '.WAV']);
+        fNum = str2double(f_name_split{2}) - start_f_num + 1;
+    end
+    
+    cut_call_data(call_f).fName = fName;
+    cut_call_data(call_f).f_num = fNum;
     cut_call_data(call_f).expDay = expDay;
     cut_call_data(call_f).batNum = batNum;
     % calculate time in whole recordings, corrected from AVI/NLG clock
@@ -63,9 +76,9 @@ for call_f = 1:n_cut_call_files
         cut_call_data(call_f).corrected_callpos = nan(1,2);
     end
 end
-
+not_manually_classified_idx = arrayfun(@(x) isempty(x.noise),cut_call_data);
+[cut_call_data(not_manually_classified_idx).noise] = deal(NaN);
 cut_call_fields = fieldnames(cut_call_data);
-cut_call_fields = cut_call_fields(~strcmp(cut_call_fields,'noise'));
 for f = 1:length(cut_call_fields)
     emptyFields = arrayfun(@(x) isempty(x.(cut_call_fields{f})), cut_call_data);
     assert(~any(emptyFields));
