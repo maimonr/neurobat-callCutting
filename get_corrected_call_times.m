@@ -9,14 +9,19 @@ wav_file_nums = cellfun(@(x) str2double(regexp(x,'(?<=_)\d+(?=.WAV)','match','ig
 [~, sort_wav_files_idx] = sort(wav_file_nums);
 
 % load cut call files
-cut_call_files = dir([analyzed_audio_dir 'T*' call_str '*.mat']);
+cut_call_files = dir(fullfile(analyzed_audio_dir,['T*' call_str '*.mat']));
 n_cut_call_files = length(cut_call_files);
 
 % get experiment date as datetime
-exp_day_str = 'neurologger_recording';
-dateFormat = 'yyyyMMdd';
-idx = strfind(audioDir,exp_day_str) + length(exp_day_str);
-expDay = datetime(audioDir(idx:idx+length(dateFormat)-1),'InputFormat',dateFormat);
+exp_day_reg_exp_str = '\d{8}';
+if contains(audioDir,'adult')
+    dateFormat = 'MMddyyyy';
+else
+    dateFormat = 'yyyyMMdd';
+end
+exp_day_str = regexp(audioDir,exp_day_reg_exp_str,'match');
+exp_day_str = exp_day_str{1};
+expDay = datetime(exp_day_str,'InputFormat',dateFormat);
 
 bat_num_str = 'bat';
 bat_num_length = 5;
@@ -42,7 +47,7 @@ end
 fs_wav = 250e3; % add in minor sampling rate correction
 
 for call_f = 1:n_cut_call_files
-    s = load([analyzed_audio_dir cut_call_files(call_f).name]);
+    s = load(fullfile(analyzed_audio_dir, cut_call_files(call_f).name));
     % transfer all data from cut call file to the data structure we're
     % building here
     cut_call_fields = fieldnames(s);

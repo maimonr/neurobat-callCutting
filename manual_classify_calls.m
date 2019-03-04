@@ -19,6 +19,7 @@ wav_mat_file = input('wav (1) or mat (2) file?');
 
 callFiles = dir([callDir '*' call_str '*.mat']);
 callNums = 1:length(callFiles);
+call_file_name_length = 21;
 
 if exist([callDir 'current_classify_file_number.mat'],'file')
     f = load([callDir 'current_classify_file_number.mat']);
@@ -26,6 +27,8 @@ if exist([callDir 'current_classify_file_number.mat'],'file')
 else
     fNum = 1;
 end
+
+replotFlag = true;
     
 nCalls = length(callFiles);
 for c = fNum:nCalls
@@ -34,12 +37,15 @@ for c = fNum:nCalls
     fs = min(s.fs,200e3);
     sound(data,fs);
     origRec_fName = strsplit(callFiles(c).name,'_');
-    
+    origRec_file_name = strjoin(origRec_fName(1:end-2),'_');
+    if length(origRec_file_name) > call_file_name_length
+        origRec_file_name = origRec_file_name(1:call_file_name_length);
+    end
     if wav_mat_file == 1
-        origRec_fName = fullfile(wd, [strjoin(origRec_fName(1:end-2),'_') '.WAV']);
+        origRec_fName = fullfile(wd, [origRec_file_name '.WAV']);
         dataFull = audioread(origRec_fName);
     elseif wav_mat_file == 2
-        origRec_fName = fullfile(wd, [strjoin(origRec_fName(1:end-2),'_') '.mat']);
+        origRec_fName = fullfile(wd, [origRec_file_name '.mat']);
         d = load(origRec_fName);
         dataFull = d.(recVar_full);
     end
@@ -52,9 +58,10 @@ for c = fNum:nCalls
     spectrogram(data,specWindow,specOverlap,freqPoints,s.fs,'yaxis');
     subplot(2,1,2);
     hold on
-    if callNum == 0
+    if callNum == 0 || replotFlag
         cla
         plot((1:length(dataFull))/s.fs,dataFull,'k');
+        replotFlag = false;
     end
     plot((s.callpos(end,1)+(0:length(data)-1))/s.fs,data);
     
@@ -94,20 +101,6 @@ for c = fNum:nCalls
                 end
                 repeat_k = repeat_k + 1;
         end
-    end
-end
-
-save_call_data = input('build and save cut call data file?');
-if save_call_data
-    cut_call_data = get_corrected_call_times(wd,callDir,call_str);
-    
-    switch call_str
-        case 'Call'
-            save([wd 'cut_call_data.mat'],'cut_call_data');
-            
-        case 'Echo'
-            save([wd 'cut_echo_data.mat'],'cut_call_data');
-            
     end
 end
 

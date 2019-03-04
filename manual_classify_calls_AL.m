@@ -1,163 +1,197 @@
-function manual_classify_calls_AL(expDate,call_str)
+function manual_classify_calls_AL(audio_dir,tsData,audio2nlg,varargin)
 al_fs = 50e3;
 addpath('C:\Users\phyllo\Documents\GitHub\SoundAnalysisBats\')
-audio_base_dir = 'Z:\users\Maimon\acoustic_recording\audio\';
+addpath('C:\Users\phyllo\Documents\Maimon\acoustic_recording\scripts\')
+addpath('C:\Users\phyllo\Documents\GitHub\LoggerDataProcessing\')
+addpath('C:\Users\phyllo\Documents\GitHub\neurobat-hardware-alignment\')
 
-date_str_format = 'mmddyyyy';
-dateStr = datestr(expDate,date_str_format);
-
-audio_dir = [audio_base_dir dateStr filesep 'audio\ch1\'];
-
-switch call_str
-    case 'Call'
-        callDir = [audio_dir 'Analyzed_auto' filesep];
-    case 'Echo'
-        callDir = [audio_dir 'Analyzed_auto_echo' filesep];
-end
-
-[~,tsData,audio2nlg] = get_AL_data(expDate);
+callDir = fullfile(audio_dir,'Analyzed_auto');
 
 specParams = struct('colormap_name','hot','spec_win_size',512,'spec_overlap_size',500,'spec_nfft',1024,'fs',al_fs,'spec_ylims',[0 10],'spec_caxis_factor',0.1);
 orig_rec_plot_win = 5;
 recVar = 'cut';
-recVar_full = 'recsGroup';
 
-wav_mat_file = input('wav (1) or mat (2) file?');
+AL_call_offset_length = 0.5;
+AL_call_offset = 1e3*0.5*AL_call_offset_length*[-1 1];
 
-callFiles = dir([callDir '*' call_str '*.mat']);
+callFiles = dir([callDir filesep '*Call*.mat']);
 callNums = 1:length(callFiles);
-
-if exist([callDir 'current_classify_file_number.mat'],'file')
-    f = load([callDir 'current_classify_file_number.mat']);
-    fNum = find(callNums == abs(min(callNums-f.fNum)));
-else
-    fNum = 1;
-end
-cum_samples = [0 cumsum(audio2nlg.total_samples_by_file)];
 nCalls = length(callFiles);
-nLogger = length(tsData);
 
-for c = fNum:nCalls
+if isempty(varargin)
+    if exist(fullfile(callDir,'current_classify_file_number.mat'),'file')
+        f = load(fullfile(callDir,'current_classify_file_number.mat'));
+        fNum = f.fNum;
+    else
+        fNum = 1;
+    end
+    classify_call_nums = fNum:nCalls;
+else
+    classify_call_nums = varargin{1};
+end
+
+manual_bat_ID_fName = fullfile(audio_dir,'manual_al_classify_batNum.mat');
+
+if exist(manual_bat_ID_fName,'file')
+    f = load(manual_bat_ID_fName);
+    manual_al_classify_batNum = f.manual_al_classify_batNum;
+else
+    manual_al_classify_batNum = cell(1,nCalls);
+    save(manual_bat_ID_fName,'manual_al_classify_batNum')
+end
+
+cum_samples = [0 cumsum(audio2nlg.total_samples_by_file)];
+nLogger = length(tsData);
+subplot_handles = cell(1,nLogger+1);
+
+for logger_k = 1:nLogger
+    subplot_handles{logger_k} = subplot(nLogger+1,1,logger_k);
+    hold(subplot_handles{logger_k},'on');
+    subplot_handles{logger_k}.XAxis.Visible = 'off';
+end
+
+subplot_handles{end} = subplot(nLogger+1,1,nLogger+1);
+hold(subplot_handles{end},'on');
+
+last_rec_name = [];
+
+for c = classify_call_nums
     
-    s = load([callDir callFiles(c).name]);
+    s = load(fullfile(callDir,callFiles(c).name));
     data = s.(recVar);
     fs = min(s.fs,200e3);
     sound(data,fs);
     origRec_fName_split = strsplit(callFiles(c).name,'_');
     wav_f_num = str2double(origRec_fName_split{2});
     
-    if wav_mat_file == 1
-        if length(origRec_fName_split) > 4
-            origRec_fName = fullfile(audio_dir, [strjoin(origRec_fName_split(1:2),'_') '.WAV']);
-            sample_offset = audio2nlg.total_samples_by_file(wav_f_num) - s.callpos(1);
-            data_full_append = s.cut(sample_offset:end);
-            dataFull = vertcat(audioread(origRec_fName),data_full_append);
-            s.callpos = [s.callpos(1) length(dataFull)];
-        else
-            origRec_fName = fullfile(audio_dir, [strjoin(origRec_fName_split(1:end-2),'_') '.WAV']);
-            dataFull = audioread(origRec_fName);
-        end
-    elseif wav_mat_file == 2
-        origRec_fName = fullfile(audio_dir, [strjoin(origRec_fName_split(1:end-2),'_') '.mat']);
-        d = load(origRec_fName);
-        dataFull = d.(recVar_full);
+    if length(origRec_fName_split) > 4
+        origRec_fName = fullfile(audio_dir, [strjoin(origRec_fName_split(1:2),'_') '.WAV']);
+        sample_offset = audio2nlg.total_samples_by_file(wav_f_num) - s.callpos(1);
+        data_full_append = s.cut(sample_offset:end);
+        dataFull = vertcat(audioread(origRec_fName),data_full_append);
+        s.callpos = [s.callpos(1) length(dataFull)];
+    else
+        origRec_fName = fullfile(audio_dir, [strjoin(origRec_fName_split(1:end-2),'_') '.WAV']);
+        dataFull = audioread(origRec_fName);
     end
     
     callNum = strsplit(callFiles(c).name,{'_','.'});
     callNum = str2double(callNum{end-1});
-    %%
-    subplot(nLogger+1,1,nLogger+1)
-    hold on
-    if callNum == 0
-        cla
-        plot((1:length(dataFull))/s.fs,dataFull,'k');
+    
+    if callNum == 0 || ~strcmp(last_rec_name,origRec_fName)
+        cla(subplot_handles{end})
+        plot(subplot_handles{end},(1:length(dataFull))/s.fs,dataFull,'k');
     end
-    plot((s.callpos(end,1)+(0:length(data)-1))/s.fs,data);
+    
+    last_rec_name = origRec_fName;
+    
+    plot(subplot_handles{end},(s.callpos(end,1)+(0:length(data)-1))/s.fs,data);
     
     if length(dataFull)/s.fs > orig_rec_plot_win
-       xlim([s.callpos(end,1)/s.fs - orig_rec_plot_win/2 s.callpos(end,1)/s.fs + orig_rec_plot_win/2])
+       xlim(subplot_handles{end},[s.callpos(end,1)/s.fs - orig_rec_plot_win/2 s.callpos(end,1)/s.fs + orig_rec_plot_win/2])
+       dataWin = round([s.callpos(end,1) - s.fs*orig_rec_plot_win/2 s.callpos(end,1) + s.fs*orig_rec_plot_win/2]);
+       dataWin(1) = max(dataWin(1),1);
+       dataWin(2) = min(dataWin(2),length(dataFull));
+       dataRange = 1.1*[min(dataFull(dataWin(1):dataWin(2))), max(dataFull(dataWin(1):dataWin(2)))];
+       ylim(subplot_handles{end},dataRange)
     end
     
     corrected_callpos = (1e3*(s.callpos + cum_samples(wav_f_num))/s.fs);
     corrected_callpos = avi2nlg_time(audio2nlg,corrected_callpos);
     
-    call_ts_nlg = (corrected_callpos + audio2nlg.first_nlg_pulse_time)*1e3;
+    call_ts_nlg = (corrected_callpos + AL_call_offset + audio2nlg.first_nlg_pulse_time)*1e3;
     
     piezo_chunk = cell(1,nLogger);
     logger_k = 1;
+    
     call_ts_nlg_sample = get_voltage_samples_for_Nlg_timestamps(call_ts_nlg(:),...
         tsData(logger_k).Indices_of_first_and_last_samples(:,1)',...
         tsData(logger_k).Timestamps_of_first_samples_usec,...
-        tsData(logger_k).Sampling_period_usec_Logger);
+        tsData(logger_k).Samples_per_channel_per_file,...
+        1e6/nanmean(tsData(logger_k).Estimated_channelFS_Transceiver));
     if isempty(call_ts_nlg_sample)
         break
     end
     
     for logger_k = 1:nLogger
-        subplot(nLogger+1,1,logger_k)
-        cla
+        cla(subplot_handles{logger_k});
         call_ts_nlg_sample = get_voltage_samples_for_Nlg_timestamps(call_ts_nlg(:),...
             tsData(logger_k).Indices_of_first_and_last_samples(:,1)',...
             tsData(logger_k).Timestamps_of_first_samples_usec,...
-            tsData(logger_k).Sampling_period_usec_Logger);
+            tsData(logger_k).Samples_per_channel_per_file,...
+            1e6/nanmean(tsData(logger_k).Estimated_channelFS_Transceiver));
         if isempty(call_ts_nlg_sample)
             break
         end
         piezo_chunk_idx = call_ts_nlg_sample(1):call_ts_nlg_sample(end);
         try
             piezo_chunk{logger_k} = double(tsData(logger_k).AD_count_int16(piezo_chunk_idx));
-            plot_call_spectrogram(piezo_chunk{logger_k},gca,specParams);
+            plot_call_spectrogram(piezo_chunk{logger_k},subplot_handles{logger_k},specParams);
         end
-        
+        callBounds = 0.5*1e3*[AL_call_offset_length AL_call_offset_length]+[0 abs(diff(corrected_callpos))];
+        plot(subplot_handles{logger_k},repmat(callBounds,2,1),specParams.spec_ylims,'k--','LineWidth',4)
+        xlim(subplot_handles{logger_k},[0 diff(corrected_callpos + AL_call_offset)]);
     end
     %%
     display(callFiles(c).name);
     
     repeat = 1;
     repeat_k = 1;
+    call_file_fName = fullfile(callDir,callFiles(c).name);
     while repeat
-        class = input('call?','s');
-        switch class
-            case '1'
-                repeat = 0;
-                s.noise = false;
-                save([callDir callFiles(c).name],'-struct','s');
-            case '0'
-                repeat = 0;
-                s.noise = true;
-                save([callDir callFiles(c).name],'-struct','s');
-            case 'stop'
-                fNum = callNums(c);
-                save([callDir 'current_classify_file_number.mat'],'fNum');
+        loggerNum = input('call?','s');
+        
+        switch loggerNum
+            
             case 'pause'
                 keyboard
+            case 'stop'
+                fNum = callNums(c);
+                save(fullfile(callDir,'current_classify_file_number.mat'),'fNum');
+                return
             otherwise
-                pause(0.1);
-                if repeat_k < 3
-                    sound(data,fs/(2*repeat_k));
+                loggerNum = str2double(loggerNum);
+                if ~isempty(loggerNum) && loggerNum>=1 && loggerNum<=nLogger
+                    repeat = 0;
+                    noiseStatus = false;
+                    manual_al_classify_batNum{c} = tsData(loggerNum).Bat_id;
+                    save_bat_num(s,noiseStatus,manual_al_classify_batNum,manual_bat_ID_fName,call_file_fName)
+
+                elseif loggerNum == 0
+                    repeat = 0;
+                    noiseStatus = true;
+                    manual_al_classify_batNum{c} = 'noise';
+                    save_bat_num(s,noiseStatus,manual_al_classify_batNum,manual_bat_ID_fName,call_file_fName)
+                    
+                elseif loggerNum == -1
+                    repeat = 0;
+                    noiseStatus = false;
+                    manual_al_classify_batNum{c} = 'unidentified';
+                    save_bat_num(s,noiseStatus,manual_al_classify_batNum,manual_bat_ID_fName,call_file_fName)
+                    
                 else
-                    startIdx = max(1,s.callpos(end,1) - (orig_rec_plot_win/2)*s.fs);
-                    endIdx = min(length(dataFull),s.callpos(end,1) + (orig_rec_plot_win/2)*s.fs);
-                    sound(dataFull(startIdx:endIdx),fs);
-                    repeat_k = 1;
+                    pause(0.1);
+                    if repeat_k < 3
+                        sound(data,fs/(2*repeat_k));
+                    else
+                        startIdx = max(1,s.callpos(end,1) - (orig_rec_plot_win/2)*s.fs);
+                        endIdx = min(length(dataFull),s.callpos(end,1) + (orig_rec_plot_win/2)*s.fs);
+                        sound(dataFull(startIdx:endIdx),fs);
+                        repeat_k = 1;
+                    end
+                    repeat_k = repeat_k + 1;
                 end
-                repeat_k = repeat_k + 1;
         end
     end
 end
 
-save_call_data = input('build and save cut call data file?');
-if save_call_data
-    cut_call_data = get_corrected_call_times(audio_dir,callDir,call_str);
-    
-    switch call_str
-        case 'Call'
-            save([audio_dir 'cut_call_data.mat'],'cut_call_data');
-            
-        case 'Echo'
-            save([audio_dir 'cut_echo_data.mat'],'cut_call_data');
-            
-    end
+
 end
+
+function save_bat_num(s,noiseStatus,manual_al_classify_batNum,manual_bat_ID_fName,call_file_fName) %#ok<INUSL>
+
+s.noise = noiseStatus;
+save(call_file_fName,'-struct','s');
+save(manual_bat_ID_fName,'manual_al_classify_batNum');
 
 end

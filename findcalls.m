@@ -1,150 +1,117 @@
-function findcalls(wd,fs,varargin)
-%% Find, extract, and save social vocalizations from audio recordings
-% INPUT:
-% wd: working directory, file path which contains files to be analyzed
-% fs: sampling rate of recorded files
-% Optional: 
-% fileType: 'wav' or 'mat' to indicate format of recordings
-% anal_dir: file path to save extracted files
-%
-% WARNING: Many individual parameters to be tuned!
-%
-% OUTPUT:
-% Individual calls will be saved off in individual file in anal_dir named 
-% with the original files's name and appeneded with a string '_Call_XXX'
-% where XXX is the three digit number of calls within that file.
-%%
+function [fcns,call_cut_params] = findcalls(data_raw,wd,fs,varargin) 
 
-pnames = {'fileType', 'outputDir', 'debug','params','dataVarName','high_filter_cutoff','low_cenv_filter_cutoff','adaptiveThreshold','thresh'};
-dflts  = {'wav', fullfile(wd, 'Analyzed_auto'),false ,[],'recsGroup',2000,1000,false,0.75e-3};
-[fileType,outputDir,debugFlag,call_cut_params,dataVarName,high_filter_cutoff,low_cenv_filter_cutoff,adaptiveThreshold,thresh] = internal.stats.parseArgs(pnames,dflts,varargin{:});
+pnames = {'fileType', 'outputDir', 'debug','params','dataVarName','envelope_win_size','adaptiveThreshold','thresh','n_std_thresh','filename','next_filename'};
+dflts  = {'wav', fullfile(wd, 'Analyzed_auto'),false ,[],'recsGroup',1e-3,false,0.75e-3,10,'cut_call',[]};
+[fileType,outputDir,debugFlag,call_cut_params,dataVarName,envelope_win_size,adaptiveThreshold,thresh,n_std_thresh,filename,next_filename] = internal.stats.parseArgs(pnames,dflts,varargin{:});
 
 allParams = struct('fileType',fileType,'outputDir',outputDir,'debugFlag',debugFlag,...
-    'dataVarName',dataVarName,'high_filter_cutoff',high_filter_cutoff,...
-    'low_cenv_filter_cutoff',low_cenv_filter_cutoff,'adaptiveThreshold',adaptiveThreshold);
-
+    'dataVarName',dataVarName,'adaptiveThreshold',adaptiveThreshold,'n_std_thresh',n_std_thresh);
 
 if adaptiveThreshold
-    n_std_thresh = 10;
     thresh = [];
 end
 
 if isempty(call_cut_params)
     % (t>=calllength && H>rmsthresh && powerRatio<powerRatioThresh && wEnt<wEntThresh)
-    callLength = 0.01; % in s
+    callLength = 0.015; % in s
     mergethresh = 5e-3; % in s
     rmsthresh=0;
     powerRatioThresh = Inf;
     wEntThresh = Inf;
     
-    call_cut_params = struct('thresh',thresh,'callLength',callLength,'rmsthresh',rmsthresh,'mergethresh',mergethresh,'powerRatioThresh',powerRatioThresh,'wEntThresh',wEntThresh,'fs',fs);
+    call_cut_params = struct('thresh',thresh,'callLength',callLength,...
+        'rmsthresh',rmsthresh,'mergethresh',mergethresh,...
+        'powerRatioThresh',powerRatioThresh,'wEntThresh',wEntThresh,'fs',fs,...
+        'n_std_thresh',n_std_thresh,'envelope_win_size',envelope_win_size);
 end
 
-rec_files = dir(fullfile(wd,['*.' fileType]));
-
-if ~isfolder(outputDir)
-    mkdir(outputDir);
+if nargout > 0
+    fcns = localfunctions;
+    return
 end
-n_files = length(rec_files);
 
+senv = get_envelope(data_raw,call_cut_params);
 
-[high_b, high_a] = butter(2,2*high_filter_cutoff/fs,'high'); % high pass filter for raw data
-[low_b,low_a] = butter(2,2*low_cenv_filter_cutoff/fs); % low pass filter for envelope
+if adaptiveThreshold % if requested set threshold to the minimum standard deviation across 10 equal sized chunks across file
+    data_round10 = 10*floor(length(data_raw)/10);
+    reshape_data_MA = reshape(data(1:data_round10),[],10);
+    thresh = n_std_thresh*min(std(reshape_data_MA));
+    call_cut_params.thresh = thresh;
+end
 
-for fln = 1:n_files
-    filename=rec_files(fln).name;
-    disp(filename)
-    disp(['Analyzing file: ' num2str(fln) ' of ' num2str(n_files)])
-    disp('...')
-    % load data and calculate envelope
-    data_raw = load_audio_data(wd,filename,fileType,dataVarName);
-    senv = get_envelope(data_raw,high_b,high_a,low_b,low_a);
-    
-    if adaptiveThreshold % if requested set threshold to the minimum standard deviation across 10 equal sized chunks across file
-        data_round10 = 10*floor(length(data_raw)/10);
-        reshape_data_MA = reshape(data(1:data_round10),[],10);
-        thresh = n_std_thresh*min(std(reshape_data_MA));
-        call_cut_params.thresh = thresh;
+[allWins,multi_file_wins] = calcWins(senv,call_cut_params(1)); % generate potential windows containing calls
+multi_file_wins = multi_file_wins{1};
+
+if ~isempty(multi_file_wins) && ~isempty(next_filename) % check for calls overlapping between 2 .wav files
+    % get succeeding file's data
+    next_data_raw = load_audio_data(wd,next_filename,fileType,dataVarName);
+    next_senv = get_envelope(next_data_raw,call_cut_params);
+    next_senv = [senv(multi_file_wins(1):end); next_senv];
+    % get end sample of call window in next file
+    [next_file_wins, next_file_multi_wins] = calcWins(next_senv,call_cut_params(1));
+    if ~isempty(next_file_multi_wins{2})
+        next_file_wins = vertcat(next_file_multi_wins{2},next_file_wins);
     end
+    next_file_wins = merge_wins(next_file_wins,fs,mergethresh);
+    next_file_wins = next_file_wins(1,:) - diff(multi_file_wins)+1;
+    % concatenate data across files
+    multi_file_data_raw = [data_raw(multi_file_wins(1):end); next_data_raw(1:next_file_wins(2))];
+    multi_file_win = [1 length(multi_file_data_raw)];
+    isCall = findCall(multi_file_win,multi_file_data_raw,call_cut_params(1));
     
-    [allWins,multi_file_wins] = calcWins(senv,call_cut_params(1)); % generate potential windows containing calls
-    multi_file_wins = multi_file_wins{1};
-    
-    if ~isempty(multi_file_wins) % check for calls overlapping between 2 .wav files
-        % get succeeding file's data
-        next_filename = rec_files(fln+1).name;
-        next_data_raw = load_audio_data(wd,next_filename,fileType,dataVarName);
-        next_senv = get_envelope(next_data_raw,high_b,high_a,low_b,low_a);
-        next_senv = [senv(multi_file_wins(1):end); next_senv];
-        % get end sample of call window in next file
-        [next_file_wins, next_file_multi_wins] = calcWins(next_senv,call_cut_params(1));
-        if ~isempty(next_file_multi_wins{2})
-            next_file_wins = vertcat(next_file_multi_wins{2},next_file_wins);
-        end
-        next_file_wins = merge_wins(next_file_wins,fs,mergethresh);
-        next_file_wins = next_file_wins(1,:) - diff(multi_file_wins)+1;
-        % concatenate data across files
-        multi_file_data_raw = [data_raw(multi_file_wins(1):end); next_data_raw(1:next_file_wins(2))];
-        multi_file_win = [1 length(multi_file_data_raw)];
-        isCall = findCall(multi_file_win,multi_file_data_raw,call_cut_params(1));
+    if isCall && ~debugFlag
+        callpos = [multi_file_wins(1) next_file_wins(1,2)];
+        cut = multi_file_data_raw;
+        save(fullfile(outputDir, [filename '_' next_filename(1:end-4) '_Call_' sprintf('%03d',1) '.mat']),'cut','callpos','fs','allParams','call_cut_params');
+    end
+end
+
+[isCall,wins] = findCall(allWins,data_raw,call_cut_params(1)); % merge windows and assess if they contain calls
+
+if length(call_cut_params)==2 && any(isCall) % do a second pass if requested
+    allWins = calcWins(senv,call_cut_params(2));
+    [isCall,wins] = findCall(allWins,data_raw,call_cut_params(2));
+end
+
+if debugFlag
+    if any(isCall)
+        cla
+        hold on
+        plot(data_raw);
+        plot(allWins',max(data_raw)*ones(2,size(allWins,1)));
+        sound(data_raw,min([fs,200e3]));
         
-        if isCall
-            callpos = [multi_file_wins(1) next_file_wins(1,2)];
-            cut = multi_file_data_raw; 
-            save(fullfile(outputDir, [filename(1:end-4) '_' next_filename(1:end-4) '_Call_' sprintf('%03d',1) '.mat']),'cut','callpos','fs','allParams','call_cut_params');
-        end
-    end
-    
-    [isCall,wins] = findCall(allWins,data_raw,call_cut_params(1)); % merge windows and assess if they contain calls
-    
-    if length(call_cut_params)==2 && any(isCall) % do a second pass if requested
-        allWins = calcWins(senv,call_cut_params(2));
-        [isCall,wins] = findCall(allWins,data_raw,call_cut_params(2));
-    end
-    
-    if debugFlag
-        if any(isCall)
-            cla
-            hold on
-            plot(data);
-            plot(allWins',max(data)*ones(2,size(allWins,1)));
-            sound(data_raw,min([fs,200e3]));
-            
-            for w = find(isCall)
-                callpos = wins(w,:);
-                cut = data_raw(callpos(1):callpos(2));
-                plot(callpos',max(data)*ones(2,1),'LineWidth',5);
-                sound(cut,min(fs,200e3));
-                keyboard;
-            end
-            plot(get(gca,'xlim'),[thresh thresh],'k')
-        end
-    else
-        file_callcount = 0;
-        for w = find(isCall) % save off calls and detection parameters
+        for w = find(isCall)
             callpos = wins(w,:);
             cut = data_raw(callpos(1):callpos(2));
-            save(fullfile(outputDir, [filename(1:end-4) '_Call_' sprintf('%03d',file_callcount) '.mat']),'cut','callpos','fs','allParams','call_cut_params');
-            file_callcount = file_callcount + 1;
+            plot(callpos',max(data_raw)*ones(2,1),'LineWidth',5);
+            sound(cut,min(fs,200e3));
+            keyboard;
         end
-        if strcmp(fileType,'mat')
-            save(fullfile(wd, filename),'analyzed','-append');
-        end
+        plot(get(gca,'xlim'),[thresh thresh],'k')
     end
-    
-    
+else
+    file_callcount = 0;
+    for w = find(isCall) % save off calls and detection parameters
+        callpos = wins(w,:);
+        cut = data_raw(callpos(1):callpos(2));
+        save(fullfile(outputDir, [filename '_Call_' sprintf('%03d',file_callcount) '.mat']),'cut','callpos','fs','allParams','call_cut_params');
+        file_callcount = file_callcount + 1;
+    end
+    if strcmp(fileType,'mat')
+        save(fullfile(wd, filename),'analyzed','-append');
+    end
 end
 
-end
-
-function senv = get_envelope(data_raw,high_b,high_a,low_b,low_a)
-
-data = filtfilt(high_b,high_a,data_raw);
-hilbenv = abs(hilbert(data));
-senv = filtfilt(low_b,low_a,hilbenv);
 
 end
 
+function senv = get_envelope(data_raw,call_cut_params)
+
+windowLength = round(call_cut_params(1).fs*call_cut_params(1).envelope_win_size);
+senv = envelope(data_raw,windowLength,'rms');
+
+end
 
 function data_raw = load_audio_data(wd,filename,fileType,dataVarName)
 

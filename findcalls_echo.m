@@ -25,10 +25,10 @@ if nargin == 2
         disp('Invalid input');
         return
     end
-    anal_dir = [wd 'Analyzed_auto_echo' filesep];
+    anal_dir = fullfile(wd, 'Analyzed_auto_echo');
 elseif nargin == 3
     fileType = varargin{1};
-    anal_dir = [wd 'Analyzed_auto_echo' filesep];
+    anal_dir = fullfile(wd, 'Analyzed_auto_echo');
 elseif nargin == 4
     fileType = varargin{1};
     anal_dir = varargin{2};
@@ -39,22 +39,23 @@ debug = false;
 low_filter_cutoff = [1e3 2e3];
 high_filter_cutoff = [40e3 50e3];
 cenv_filter_cutoff = [1e3 2e3];
-n_std_thresh_high = 10;
-n_std_thresh_low = 10;
+n_std_thresh_high = 7;
+n_std_thresh_low = 25;
 quiet_file_thresh = 1e-3;
-echo_separation = 1e-3 * [10 40]; %in sec
+echo_separation = 1e-3 * [10 30]; %in sec
 durthresh_max= 1e-2;
 echo_peak_offset = 1e-3*[3 3];
 n_baseline_chunks = 10;
 smooth_span = 4e-3*fs;
 min_peak_prominence = 1e-5;
-remove_isolated_calls = false;
+remove_isolated_calls = true;
+min_call_sep = 0.5;
 
 [hpFilt(1,:), hpFilt(2,:)] = ellip(5,5,60,2*high_filter_cutoff(1)/fs,'high');
 [lpFilt(1,:), lpFilt(2,:)] = ellip(5,5,60,2*low_filter_cutoff(2)/fs,'low');
 [cenvFilt(1,:), cenvFilt(2,:)] = ellip(5,5,60,2*cenv_filter_cutoff(2)/fs,'low');
 
-rec_files = dir([wd '*.' fileType]);
+rec_files = dir(fullfile(wd,['*.' fileType]));
 
 if ~isfolder(anal_dir)
     mkdir(anal_dir);
@@ -72,7 +73,7 @@ for fln = 1:n_files
     disp(filename)
     disp(['Analyzing file: ' num2str(fln) ' of ' num2str(n_files)])
     disp('...')
-    data_raw = audioread([wd filename]);
+    data_raw = audioread(fullfile(wd, filename));
     if debug
         figure(h1)
         plot((1:length(data_raw))/fs,data_raw);
@@ -120,7 +121,7 @@ for fln = 1:n_files
     wins = wins(wins(:,1)~=0,:);
     if remove_isolated_calls
         if file_callcount >= 2
-            call_sep = [inf; wins(2:end,1) - wins(1:end-1,2); inf];
+            call_sep = [inf; wins(2:end,1) - wins(1:end-1,2); inf]/fs;
             isolated_calls = zeros(1,file_callcount);
             for call = 1:file_callcount
                 isolated_calls(call) = ~any(call_sep(call:call+1) <  min_call_sep);
@@ -176,7 +177,7 @@ for fln = 1:n_files
         for w = 1:size(wins,1)
             cut = cutcalls{w};
             callpos = wins(w,:);
-            save([anal_dir filename(1:end-4) '_Echo_' sprintf('%03d',w-1) '.mat'],'cut','callpos','fs');
+            save(fullfile(anal_dir,[filename(1:end-4) '_Echo_' sprintf('%03d',w-1) '.mat']),'cut','callpos','fs');
         end
     end
 end
