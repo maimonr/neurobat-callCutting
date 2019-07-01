@@ -3,22 +3,30 @@ function findcalls_session(wd,fs,varargin)
 % INPUT:
 % wd: working directory, file path which contains files to be analyzed
 % fs: sampling rate of recorded files
-% Optional: 
+% Optional:
 % fileType: 'wav' or 'mat' to indicate format of recordings
 % anal_dir: file path to save extracted files
 %
 % WARNING: Many individual parameters to be tuned!
 %
 % OUTPUT:
-% Individual calls will be saved off in individual file in anal_dir named 
+% Individual calls will be saved off in individual file in anal_dir named
 % with the original files's name and appeneded with a string '_Call_XXX'
 % where XXX is the three digit number of calls within that file.
 
-pnames = {'fileType', 'outputDir', 'dataVarName','findcall_inputs'};
-dflts  = {'wav', fullfile(wd, 'Analyzed_auto'),'recsGroup',{}};
-[fileType,outputDir,dataVarName,findcall_inputs] = internal.stats.parseArgs(pnames,dflts,varargin{:});
+pnames = {'fileType', 'outputDir', 'dataVarName','findcall_inputs','audio_file_filter','filter_raw_data','expType'};
+dflts  = {'wav', fullfile(wd, 'Analyzed_auto'),'recsGroup',{},'*',false,'communication'};
+[fileType,outputDir,dataVarName,findcall_inputs,audio_file_filter,filter_raw_data,expType] = internal.stats.parseArgs(pnames,dflts,varargin{:});
 
-rec_files = dir(fullfile(wd,['*.' fileType]));
+switch expType
+    case 'communication'
+        rec_files = dir(fullfile(wd,[audio_file_filter '.' fileType]));
+    case 'operant'
+        rec_files = dir(fullfile(wd,[audio_file_filter '.' fileType]));
+        rec_file_numbers = cellfun(@(x) str2double(x(strfind(x,'mic1_')+length('mic1_'):strfind(x,'.wav')-1)),{rec_files.name});
+        [~,wav_file_order] = sort(rec_file_numbers,'ascend');
+        rec_files = rec_files(wav_file_order);
+end
 
 if ~isfolder(outputDir)
     mkdir(outputDir);
@@ -31,7 +39,7 @@ for fln = 1:n_files
     disp(['Analyzing file: ' num2str(fln) ' of ' num2str(n_files)])
     disp('...')
     % load data and calculate envelope
-    data_raw = load_audio_data(wd,filename,fileType,dataVarName); 
+    data_raw = load_audio_data(wd,filename,fileType,dataVarName,filter_raw_data);
     filename = filename(1:end-4);
     if fln < n_files
         next_filename = rec_files(fln+1).name;
@@ -46,11 +54,11 @@ end
 
 
 
-function data_raw = load_audio_data(wd,filename,fileType,dataVarName)
+function data_raw = load_audio_data(wd,filename,fileType,dataVarName,filterFlag)
 
 switch fileType
     case 'wav'
-        data_raw = audioread(fullfile(wd, filename));
+        [data_raw,fs] = audioread(fullfile(wd, filename));
     case 'mat'
         data_raw = load(fullfile(wd, filename));
         if isfield(data_raw,'analyzed')
@@ -60,6 +68,11 @@ switch fileType
             end
         end
         data_raw = data_raw.(dataVarName);
+end
+
+if filterFlag
+    [b,a] = butter(4,500/(fs/2),'high');
+    data_raw = filtfilt(b,a,data_raw);
 end
 
 end
