@@ -1,8 +1,8 @@
 function [fcns,call_cut_params] = findcalls(data_raw,wd,fs,varargin) 
 
-pnames = {'fileType', 'outputDir', 'debug','params','dataVarName','envelope_win_size','adaptiveThreshold','thresh','n_std_thresh','filename','next_filename'};
-dflts  = {'wav', fullfile(wd, 'Analyzed_auto'),false ,[],'recsGroup',1e-3,false,0.75e-3,10,'cut_call',[]};
-[fileType,outputDir,debugFlag,call_cut_params,dataVarName,envelope_win_size,adaptiveThreshold,thresh,n_std_thresh,filename,next_filename] = internal.stats.parseArgs(pnames,dflts,varargin{:});
+pnames = {'fileType', 'outputDir', 'debug','params','dataVarName','envelope_win_size','adaptiveThreshold','thresh','n_std_thresh','filename','next_filename','plot_offset_s'};
+dflts  = {'wav', fullfile(wd, 'Analyzed_auto'),false ,[],'recsGroup',1e-3,false,0.75e-3,10,'cut_call',[],3};
+[fileType,outputDir,debugFlag,call_cut_params,dataVarName,envelope_win_size,adaptiveThreshold,thresh,n_std_thresh,filename,next_filename,plot_offset_s] = internal.stats.parseArgs(pnames,dflts,varargin{:});
 
 allParams = struct('fileType',fileType,'outputDir',outputDir,'debugFlag',debugFlag,...
     'dataVarName',dataVarName,'adaptiveThreshold',adaptiveThreshold,'n_std_thresh',n_std_thresh);
@@ -75,17 +75,19 @@ end
 
 if debugFlag
     if any(isCall)
-        cla
         hold on
-        plot(data_raw);
-        plot(allWins',max(data_raw)*ones(2,size(allWins,1)));
-        sound(data_raw,min([fs,200e3]));
-        
         for w = find(isCall)
+            cla
+            plot(allWins'/fs,max(data_raw)*ones(2,size(allWins,1)));
             callpos = wins(w,:);
-            cut = data_raw(callpos(1):callpos(2));
-            plot(callpos',max(data_raw)*ones(2,1),'LineWidth',5);
-            sound(cut,min(fs,200e3));
+            plot(callpos'/fs,max(data_raw)*ones(2,1),'LineWidth',5);
+            
+            call_pos_win = callpos + (fs*[-plot_offset_s plot_offset_s]);
+            call_pos_win(1) = max(1,call_pos_win(1)); call_pos_win(2) = min(length(data_raw),call_pos_win(2));
+            call_pos_idx = call_pos_win(1):call_pos_win(2);
+            plot(call_pos_idx/fs,data_raw(call_pos_idx));
+            xlim(call_pos_win/fs);
+            sound(data_raw(call_pos_idx),min(fs,200e3));
             keyboard;
         end
         plot(get(gca,'xlim'),[thresh thresh],'k')
