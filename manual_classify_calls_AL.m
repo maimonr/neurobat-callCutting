@@ -1,9 +1,9 @@
 function manual_classify_calls_AL(audio_dir,tsData,audio2nlg,varargin)
 al_fs = 50e3;
-addpath('C:\Users\phyllo\Documents\GitHub\SoundAnalysisBats\')
-addpath('C:\Users\phyllo\Documents\Maimon\acoustic_recording\scripts\')
-addpath('C:\Users\phyllo\Documents\GitHub\LoggerDataProcessing\')
-addpath('C:\Users\phyllo\Documents\GitHub\neurobat-hardware-alignment\')
+% addpath('C:\Users\phyllo\Documents\GitHub\SoundAnalysisBats\')
+% addpath('C:\Users\phyllo\Documents\Maimon\acoustic_recording\scripts\')
+% addpath('C:\Users\phyllo\Documents\GitHub\LoggerDataProcessing\')
+% addpath('C:\Users\phyllo\Documents\GitHub\neurobat-hardware-alignment\')
 
 pnames = {'recType', 'classify_call_nums'};
 dflts  = {'avisoft', []};
@@ -73,9 +73,11 @@ for c = classify_call_nums
     call_file_fName = fullfile(callDir,callFiles(c).name);
     s = load(call_file_fName);
     data = s.(recVar);
+    dataRescaled = rescale(data) - 0.5;
+    dataRescaled = dataRescaled - mean(dataRescaled);
     fs = min(s.fs,200e3);
     avi_fs = s.fs - avi_fs_correction;
-    sound(data,fs);
+    sound(0.5*dataRescaled,fs);
    
     origRec_fName_split = strsplit(callFiles(c).name,'_');
     
@@ -230,11 +232,11 @@ for c = classify_call_nums
                 else
                     pause(0.1);
                     if repeat_k < 3
-                        sound(data,fs/(2*repeat_k));
+                        sound(0.5*dataRescaled,fs/(2*repeat_k));
                     else
                         startIdx = max(1,s.callpos(end,1) - (orig_rec_plot_win/2)*avi_fs);
                         endIdx = min(length(dataFull),s.callpos(end,1) + (orig_rec_plot_win/2)*avi_fs);
-                        sound(dataFull(startIdx:endIdx),fs);
+                        sound(0.5*(rescale(dataFull(startIdx:endIdx))-0.5),fs);
                         repeat_k = 1;
                     end
                     repeat_k = repeat_k + 1;

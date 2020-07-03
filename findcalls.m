@@ -77,17 +77,21 @@ if debugFlag
     if any(isCall)
         hold on
         for w = find(isCall)
+            %%
             cla
-            plot(allWins'/fs,max(data_raw)*ones(2,size(allWins,1)));
+            clear sound
             callpos = wins(w,:);
-            plot(callpos'/fs,max(data_raw)*ones(2,1),'LineWidth',5);
-            
             call_pos_win = callpos + (fs*[-plot_offset_s plot_offset_s]);
             call_pos_win(1) = max(1,call_pos_win(1)); call_pos_win(2) = min(length(data_raw),call_pos_win(2));
             call_pos_idx = call_pos_win(1):call_pos_win(2);
+            
+            plot(allWins'/fs,max(data_raw)*ones(2,size(allWins,1)));
+            plot(callpos'/fs,0.9*max(data_raw(call_pos_idx))*ones(2,1),'LineWidth',5);
             plot(call_pos_idx/fs,data_raw(call_pos_idx));
             xlim(call_pos_win/fs);
+            ylim([min(data_raw(call_pos_idx)) max(data_raw(call_pos_idx))])
             sound(data_raw(call_pos_idx),min(fs,200e3));
+            %%
             keyboard;
         end
         plot(get(gca,'xlim'),[thresh thresh],'k')
