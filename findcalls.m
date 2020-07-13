@@ -34,7 +34,7 @@ senv = get_envelope(data_raw,call_cut_params);
 
 if adaptiveThreshold % if requested set threshold to the minimum standard deviation across 10 equal sized chunks across file
     data_round10 = 10*floor(length(data_raw)/10);
-    reshape_data_MA = reshape(data(1:data_round10),[],10);
+    reshape_data_MA = reshape(data_raw(1:data_round10),[],10);
     thresh = n_std_thresh*min(std(reshape_data_MA));
     call_cut_params.thresh = thresh;
 end
@@ -52,17 +52,19 @@ if ~isempty(multi_file_wins) && ~isempty(next_filename) % check for calls overla
     if ~isempty(next_file_multi_wins{2})
         next_file_wins = vertcat(next_file_multi_wins{2},next_file_wins);
     end
-    next_file_wins = merge_wins(next_file_wins,fs,mergethresh);
-    next_file_wins = next_file_wins(1,:) - diff(multi_file_wins)+1;
-    % concatenate data across files
-    multi_file_data_raw = [data_raw(multi_file_wins(1):end); next_data_raw(1:next_file_wins(2))];
-    multi_file_win = [1 length(multi_file_data_raw)];
-    isCall = findCall(multi_file_win,multi_file_data_raw,call_cut_params(1));
-    
-    if isCall && ~debugFlag
-        callpos = [multi_file_wins(1) next_file_wins(1,2)];
-        cut = multi_file_data_raw;
-        save(fullfile(outputDir, [filename '_' next_filename(1:end-4) '_Call_' sprintf('%03d',1) '.mat']),'cut','callpos','fs','allParams','call_cut_params');
+    if ~isempty(next_file_wins)
+        next_file_wins = merge_wins(next_file_wins,fs,mergethresh);
+        next_file_wins = next_file_wins(1,:) - diff(multi_file_wins)+1;
+        % concatenate data across files
+        multi_file_data_raw = [data_raw(multi_file_wins(1):end); next_data_raw(1:next_file_wins(2))];
+        multi_file_win = [1 length(multi_file_data_raw)];
+        isCall = findCall(multi_file_win,multi_file_data_raw,call_cut_params(1));
+        
+        if isCall && ~debugFlag
+            callpos = [multi_file_wins(1) next_file_wins(1,2)];
+            cut = multi_file_data_raw;
+            save(fullfile(outputDir, [filename '_' next_filename(1:end-4) '_Call_' sprintf('%03d',1) '.mat']),'cut','callpos','fs','allParams','call_cut_params');
+        end
     end
 end
 

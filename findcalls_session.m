@@ -14,9 +14,9 @@ function findcalls_session(wd,fs,varargin)
 % with the original files's name and appeneded with a string '_Call_XXX'
 % where XXX is the three digit number of calls within that file.
 
-pnames = {'fileType', 'outputDir', 'dataVarName','findcall_inputs','audio_file_filter','filter_raw_data','expType'};
-dflts  = {'wav', fullfile(wd, 'Analyzed_auto'),'recsGroup',{},'*',false,'communication'};
-[fileType,outputDir,dataVarName,findcall_inputs,audio_file_filter,filter_raw_data,expType] = internal.stats.parseArgs(pnames,dflts,varargin{:});
+pnames = {'fileType', 'outputDir', 'dataVarName','findcall_inputs','audio_file_filter','filter_raw_data','expType','clippingCorrection'};
+dflts  = {'wav', fullfile(wd, 'Analyzed_auto'),'recsGroup',{},'*',false,'communication',false};
+[fileType,outputDir,dataVarName,findcall_inputs,audio_file_filter,filter_raw_data,expType,clippingCorrection] = internal.stats.parseArgs(pnames,dflts,varargin{:});
 
 switch expType
     case 'communication'
@@ -28,7 +28,14 @@ switch expType
         rec_files = rec_files(wav_file_order);
 end
 
-if ~isfolder(outputDir)
+debugFlag = false;
+if any(strcmp(findcall_inputs,'debug'))
+    if findcall_inputs{find(strcmp(findcall_inputs,'debug'))+1}
+        debugFlag = true;
+    end
+end
+
+if ~debugFlag && ~isfolder(outputDir)
     mkdir(outputDir);
 end
 n_files = length(rec_files);
@@ -39,7 +46,7 @@ for fln = 1:n_files
     disp(['Analyzing file: ' num2str(fln) ' of ' num2str(n_files)])
     disp('...')
     % load data and calculate envelope
-    data_raw = load_audio_data(wd,filename,fileType,dataVarName,filter_raw_data);
+    data_raw = load_audio_data(wd,filename,fileType,dataVarName,filter_raw_data,clippingCorrection);
     filename = filename(1:end-4);
     if fln < n_files
         next_filename = rec_files(fln+1).name;
@@ -54,7 +61,7 @@ end
 
 
 
-function data_raw = load_audio_data(wd,filename,fileType,dataVarName,filterFlag)
+function data_raw = load_audio_data(wd,filename,fileType,dataVarName,filterFlag,clippingCorrection)
 
 switch fileType
     case 'wav'
@@ -68,6 +75,14 @@ switch fileType
             end
         end
         data_raw = data_raw.(dataVarName);
+end
+
+if clippingCorrection
+   clippingIdx = find(diff(data_raw) < -0.9) + 1;
+   while ~isempty(clippingIdx)
+       data_raw(clippingIdx) = data_raw(clippingIdx) + 1;
+       clippingIdx = find(diff(data_raw) < -0.9) + 1;
+   end
 end
 
 if filterFlag
