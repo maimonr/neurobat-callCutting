@@ -2,9 +2,9 @@ function manual_classify_calls(wd,call_str)
 
 switch call_str
     case 'Call'
-        callDir = [wd 'Analyzed_auto' filesep];
+        callDir = fullfile(wd,'Analyzed_auto');
     case 'Echo'
-        callDir = [wd 'Analyzed_auto_echo' filesep];
+        callDir = fullfile(wd,'Analyzed_auto_echo');
 end
 
 
@@ -17,12 +17,12 @@ recVar_full = 'recsGroup';
 
 wav_mat_file = input('wav (1) or mat (2) file?');
 
-callFiles = dir([callDir '*' call_str '*.mat']);
+callFiles = dir(fullfile(callDir,['*' call_str '*.mat']));
 callNums = 1:length(callFiles);
 call_file_name_length = 21;
 
-if exist([callDir 'current_classify_file_number.mat'],'file')
-    f = load([callDir 'current_classify_file_number.mat']);
+if exist(fullfile(callDir,'current_classify_file_number.mat'),'file')
+    f = load(fullfile(callDir,'current_classify_file_number.mat'));
     fNum = find(callNums == abs(min(callNums-f.fNum)));
 else
     fNum = 1;
@@ -32,7 +32,7 @@ replotFlag = true;
     
 nCalls = length(callFiles);
 for c = fNum:nCalls
-    s = load([callDir callFiles(c).name]);
+    s = load(fullfile(callDir,callFiles(c).name));
     data = s.(recVar);
     fs = min(s.fs,200e3);
     sound(data,fs);
@@ -79,14 +79,14 @@ for c = fNum:nCalls
             case '1'
                 repeat = 0;
                 s.noise = false;
-                save([callDir callFiles(c).name],'-struct','s');
+                save(fullfile(callDir,callFiles(c).name),'-struct','s');
             case '0'
                 repeat = 0;
                 s.noise = true;
-                save([callDir callFiles(c).name],'-struct','s');
+                save(fullfile(callDir,callFiles(c).name),'-struct','s');
             case 'stop'
                 fNum = callNums(c);
-                save([callDir 'current_classify_file_number.mat'],'fNum');
+                save(fullfile(callDir,'current_classify_file_number.mat'),'fNum');
             case 'pause'
                 keyboard
             otherwise
