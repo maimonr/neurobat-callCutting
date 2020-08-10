@@ -11,7 +11,7 @@ dflts  = {'avisoft', []};
 
 callDir = fullfile(audio_dir,'Analyzed_auto');
 
-specParams = struct('colormap_name','hot','spec_win_size',512,'spec_overlap_size',500,'spec_nfft',512,'fs',al_fs,'spec_ylims',[0 10],'spec_caxis_factor',0.1);
+specParams = struct('colormap_name','hot','spec_win_size',256,'spec_overlap_size',100,'spec_nfft',512,'fs',al_fs,'spec_ylims',[0 10],'spec_caxis_factor',0.4);
 orig_rec_plot_win = 5;
 recVar = 'cut';
 
@@ -25,13 +25,15 @@ callFiles = dir([callDir filesep '*Call*.mat']);
 callNums = 1:length(callFiles);
 nCalls = length(callFiles);
 
-if strcmp(expType,'operant')
-    wav_file_num_regexp_str = '_\d{1,2}_Call';
-    wav_file_nums = arrayfun(@(x) regexp(x.name,wav_file_num_regexp_str,'match'),callFiles,'un',0);
-    wav_file_nums = cellfun(@(x) str2double(strrep(strrep(x{1},'_',''),'Call','')),wav_file_nums);
-    [~,wav_file_sort_idx] = sort(wav_file_nums);
-    callFiles = callFiles(wav_file_sort_idx);
-end
+% sort wav files according to numbering
+call_file_nums = arrayfun(@(x) str2double(regexp(x.name,'(?<=_)\d+(?=_Call)','match','ignorecase')), callFiles);
+[~, sort_files_idx] = sort(call_file_nums);
+callFiles = callFiles(sort_files_idx);
+
+wavFnames = dir(fullfile(audio_dir,'*.wav'));
+wav_file_nums = arrayfun(@(x) str2double(regexp(x.name,'(?<=_)\d+(?=.WAV)','match','ignorecase')), wavFnames);
+wav_file_nums = sort(wav_file_nums);
+start_wav_f_num = wav_file_nums(1);
 
 if isempty(classify_call_nums)
     if exist(fullfile(callDir,'current_classify_file_number.mat'),'file')
@@ -61,6 +63,11 @@ for logger_k = 1:nLogger
     subplot_handles{logger_k} = subplot(nLogger+1,1,logger_k);
     hold(subplot_handles{logger_k},'on');
     subplot_handles{logger_k}.XAxis.Visible = 'off';
+    subplot_handles{logger_k}.YAxis.Label.String = sprintf('Bat %s\nLogger %s',tsData{logger_k}.Bat_id,num2str(logger_k));
+    subplot_handles{logger_k}.YAxis.Label.FontSize = 14;
+    subplot_handles{logger_k}.YAxis.Label.Rotation = 0;
+    subplot_handles{logger_k}.YAxis.Label.Units = 'normalized';
+    subplot_handles{logger_k}.YAxis.Label.Position([1 2]) = [-0.1 0.25];
 end
 
 subplot_handles{end} = subplot(nLogger+1,1,nLogger+1);
@@ -106,13 +113,13 @@ for c = classify_call_nums
         
         if strcmp(expType,'operant')
             
-            wav_f_num = str2double(origRec_fName_split{6});
+            wav_f_num = str2double(origRec_fName_split{6}) - start_wav_f_num + 1;
             dataFull = audioread(origRec_fName);
             [b,a] = butter(4,500/(fs/2),'high');
             dataFull = filtfilt(b,a,dataFull);
             
         else
-            wav_f_num = str2double(origRec_fName_split{2});
+            wav_f_num = str2double(origRec_fName_split{2}) - start_wav_f_num + 1;
             
             if length(origRec_fName_split) > 4
                 sample_offset = audio2nlg.total_samples_by_file(wav_f_num) - s.callpos(1);
@@ -156,10 +163,10 @@ for c = classify_call_nums
     logger_k = 1;
     
     call_ts_nlg_sample = get_voltage_samples_for_Nlg_timestamps(call_ts_nlg(:),...
-        tsData(logger_k).Indices_of_first_and_last_samples(:,1)',...
-        tsData(logger_k).Timestamps_of_first_samples_usec,...
-        tsData(logger_k).Samples_per_channel_per_file,...
-        1e6/nanmean(tsData(logger_k).Estimated_channelFS_Transceiver));
+        tsData{logger_k}.Indices_of_first_and_last_samples(:,1)',...
+        tsData{logger_k}.Timestamps_of_first_samples_usec,...
+        tsData{logger_k}.Samples_per_channel_per_file,...
+        1e6/nanmean(tsData{logger_k}.Estimated_channelFS_Transceiver));
     if isempty(call_ts_nlg_sample)
         break
     end
@@ -167,16 +174,16 @@ for c = classify_call_nums
     for logger_k = 1:nLogger
         cla(subplot_handles{logger_k});
         call_ts_nlg_sample = get_voltage_samples_for_Nlg_timestamps(call_ts_nlg(:),...
-            tsData(logger_k).Indices_of_first_and_last_samples(:,1)',...
-            tsData(logger_k).Timestamps_of_first_samples_usec,...
-            tsData(logger_k).Samples_per_channel_per_file,...
-            1e6/nanmean(tsData(logger_k).Estimated_channelFS_Transceiver));
+            tsData{logger_k}.Indices_of_first_and_last_samples(:,1)',...
+            tsData{logger_k}.Timestamps_of_first_samples_usec,...
+            tsData{logger_k}.Samples_per_channel_per_file,...
+            1e6/nanmean(tsData{logger_k}.Estimated_channelFS_Transceiver));
         if isempty(call_ts_nlg_sample)
             break
         end
         piezo_chunk_idx = call_ts_nlg_sample(1):call_ts_nlg_sample(end);
         try
-            piezo_chunk{logger_k} = double(tsData(logger_k).AD_count_int16(piezo_chunk_idx));
+            piezo_chunk{logger_k} = double(tsData{logger_k}.AD_count_int16(1,piezo_chunk_idx));
             plot_call_spectrogram(piezo_chunk{logger_k},subplot_handles{logger_k},specParams);
         end
         callBounds = 0.5*1e3*[AL_call_offset_length AL_call_offset_length]+[0 abs(diff(corrected_callpos))];
@@ -201,18 +208,29 @@ for c = classify_call_nums
                 return
             case 'backup'
                 nBackup = input('Backup by how many calls?');
-                fNum = callNums(c-nBackup);
-                save(fullfile(callDir,'current_classify_file_number.mat'),'fNum');
-                return
+                if isnumeric(nBackup) && length(nBackup) == 1
+                    fNum = callNums(c-nBackup);
+                    save(fullfile(callDir,'current_classify_file_number.mat'),'fNum');
+                    return
+                else
+                    disp('Please enter single number of calls to backup by')
+                end
+            case 'listen'
+                logger_k = input('Which logger to listen to?');
+                if logger_k <= nLogger
+                    sound(0.05*zscore(piezo_chunk{logger_k}),al_fs)
+                else
+                    fprintf('Logger %d does not exist\n',logger_k)
+                end
             otherwise
                 loggerNum = str2double(strsplit(loggerNum,','));
                 if ~isempty(loggerNum) && all(loggerNum>=1) && all(loggerNum<=nLogger)
                     repeat = 0;
                     noiseStatus = false;
                     if length(loggerNum) == 1
-                        manual_al_classify_batNum{c} = tsData(loggerNum).Bat_id;
+                        manual_al_classify_batNum{c} = tsData{loggerNum}.Bat_id;
                     else
-                        manual_al_classify_batNum{c} = {tsData(loggerNum).Bat_id};
+                        manual_al_classify_batNum{c} = cellfun(@(x) x.Bat_id,tsData(loggerNum),'un',0);
                     end
                     save_bat_num(s,noiseStatus,manual_al_classify_batNum,manual_bat_ID_fName,call_file_fName)
 

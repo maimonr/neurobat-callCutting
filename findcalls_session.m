@@ -47,6 +47,9 @@ for fln = 1:n_files
     disp('...')
     % load data and calculate envelope
     data_raw = load_audio_data(wd,filename,fileType,dataVarName,filter_raw_data,clippingCorrection);
+    if isempty(data_raw)
+        continue
+    end
     filename = filename(1:end-4);
     if fln < n_files
         next_filename = rec_files(fln+1).name;
@@ -65,7 +68,17 @@ function data_raw = load_audio_data(wd,filename,fileType,dataVarName,filterFlag,
 
 switch fileType
     case 'wav'
-        [data_raw,fs] = audioread(fullfile(wd, filename));
+        try
+            [data_raw,fs] = audioread(fullfile(wd, filename));
+        catch err
+            if strcmp(err.identifier,'MATLAB:audiovideo:audioread:Unexpected')
+                disp('Corrupted File!')
+                data_raw = [];
+                return
+            else
+                rethrow(err)
+            end
+        end
     case 'mat'
         data_raw = load(fullfile(wd, filename));
         if isfield(data_raw,'analyzed')

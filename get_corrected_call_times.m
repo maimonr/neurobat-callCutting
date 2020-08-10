@@ -10,7 +10,7 @@ wav_files = dir(fullfile(audioDir, [audio_file_filter '.wav'])); % load raw audi
 % sort wav files according to numbering
 wav_files_name = {wav_files.name};
 wav_file_nums = cellfun(@(x) str2double(regexp(x,'(?<=_)\d+(?=.WAV)','match','ignorecase')), wav_files_name);
-[~, sort_wav_files_idx] = sort(wav_file_nums);
+wav_file_nums = sort(wav_file_nums);
 
 % load cut call files
 cut_call_files = dir(fullfile(analyzed_audio_dir,['*_' call_str '_*.mat']));
@@ -38,7 +38,7 @@ end
 % initialize data structure
 cut_call_data = struct('callpos',{},'cut',{},'corrected_callpos',{},'f_num',{},'fName',{},'fs',{},'noise',{},'expDay',{},'batNum',{});
 % determine which number raw .wav files started, in case not 1
-start_f_num = wav_file_nums(sort_wav_files_idx(1));
+start_f_num = wav_file_nums(1);
 
 % calculate cumulative samples from beginning of recording to place call in
 % time relative to entire recording
